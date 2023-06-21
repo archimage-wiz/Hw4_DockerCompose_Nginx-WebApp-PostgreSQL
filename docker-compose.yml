@@ -1,0 +1,63 @@
+version: '3.9'
+
+services:
+
+  posgres_db:
+    image: postgres:latest
+    container_name: postgres_base
+    restart: unless-stopped
+    # volumes:
+    #   - .:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 7s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+    environment:
+      POSTGRES_DB: "netology_stocks_products"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "111"
+
+   
+  web_app:
+    build: docker_builds/web_app/
+    working_dir: /src
+    image: archimagewiz/web_app
+    container_name: web_app_c
+    ports:
+      - 8000:8000
+    depends_on:
+      posgres_db:
+          condition: service_healthy
+
+    environment:
+      - SECRET_KEY=KLFNR032048023OIJFAJFOJDWS$$$(^@#)
+      - DEBUG=True
+      - ALLOWED_HOSTS=*,web_app,0.0.0.0,127.0.0.0
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=netology_stocks_products
+      - DB_HOST=posgres_db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=111
+
+    command: bash -c "python manage.py migrate &&
+                      gunicorn -b 0.0.0.0:8000 --workers 5 stocks_products.wsgi"
+
+
+  nginx:
+    build: docker_builds/nginx/
+    image: archimagewiz/nginx_base
+    container_name: nginx_base
+    # restart: unless-stopped
+    ports:
+      - 80:80
+    volumes:
+      - ./docker_builds/nginx/html/home:/www/home/
+    #   - ./docker_builds/nginx/html/home/static:/www/home/static
+    depends_on:
+      - web_app
+
+
+
